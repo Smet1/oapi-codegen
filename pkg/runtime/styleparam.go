@@ -14,6 +14,7 @@
 package runtime
 
 import (
+	"encoding"
 	"errors"
 	"fmt"
 	"net/url"
@@ -180,7 +181,6 @@ func marshalDateTimeValue(value interface{}) (string, bool) {
 }
 
 func styleStruct(style string, explode bool, paramName string, paramLocation ParamLocation, value interface{}) (string, error) {
-
 	if timeVal, ok := marshalDateTimeValue(value); ok {
 		styledVal, err := stylePrimitive(style, explode, paramName, paramLocation, timeVal)
 		if err != nil {
@@ -369,7 +369,26 @@ func primitiveToString(value interface{}) (string, error) {
 	case reflect.String:
 		output = v.String()
 	default:
-		return "", fmt.Errorf("unsupported type %s", reflect.TypeOf(value).String())
+		switch vt := value.(type) {
+		case fmt.Stringer:
+			output = vt.String()
+		case encoding.TextMarshaler:
+			tmp, err := vt.MarshalText()
+			if err != nil {
+				return "", fmt.Errorf("can't marshal text: %w", err)
+			}
+
+			output = string(tmp)
+		case encoding.BinaryMarshaler:
+			tmp, err := vt.MarshalBinary()
+			if err != nil {
+				return "", fmt.Errorf("can't marshal binary: %w", err)
+			}
+
+			output = string(tmp)
+		default:
+			return "", fmt.Errorf("unsupported type %s", reflect.TypeOf(value).String())
+		}
 	}
 	return output, nil
 }
