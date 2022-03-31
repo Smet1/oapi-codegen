@@ -189,6 +189,15 @@ func styleStruct(style string, explode bool, paramName string, paramLocation Par
 		return styledVal, nil
 	}
 
+	if stringerVal, err := convertString(value); err == nil {
+		styledVal, err := stylePrimitive(style, explode, paramName, paramLocation, stringerVal)
+		if err != nil {
+			return "", fmt.Errorf("failed to style value: %w", err)
+		}
+
+		return styledVal, nil
+	}
+
 	if style == "deepObject" {
 		if !explode {
 			return "", errors.New("deepObjects must be exploded")
@@ -369,27 +378,37 @@ func primitiveToString(value interface{}) (string, error) {
 	case reflect.String:
 		output = v.String()
 	default:
-		switch vt := value.(type) {
-		case fmt.Stringer:
-			output = vt.String()
-		case encoding.TextMarshaler:
-			tmp, err := vt.MarshalText()
-			if err != nil {
-				return "", fmt.Errorf("can't marshal text: %w", err)
-			}
-
-			output = string(tmp)
-		case encoding.BinaryMarshaler:
-			tmp, err := vt.MarshalBinary()
-			if err != nil {
-				return "", fmt.Errorf("can't marshal binary: %w", err)
-			}
-
-			output = string(tmp)
-		default:
-			return "", fmt.Errorf("unsupported type %s", reflect.TypeOf(value).String())
-		}
+		return convertString(value)
 	}
+
+	return output, nil
+}
+
+// convertString - converts Stringer, TextMarshaller or BinerMarshaller to stirng
+func convertString(value interface{}) (string, error) {
+	output := ""
+
+	switch vt := value.(type) {
+	case fmt.Stringer:
+		output = vt.String()
+	case encoding.TextMarshaler:
+		tmp, err := vt.MarshalText()
+		if err != nil {
+			return "", fmt.Errorf("can't marshal text: %w", err)
+		}
+
+		output = string(tmp)
+	case encoding.BinaryMarshaler:
+		tmp, err := vt.MarshalBinary()
+		if err != nil {
+			return "", fmt.Errorf("can't marshal binary: %w", err)
+		}
+
+		output = string(tmp)
+	default:
+		return "", fmt.Errorf("unsupported type %s", reflect.TypeOf(value).String())
+	}
+
 	return output, nil
 }
 
